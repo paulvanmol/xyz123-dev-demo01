@@ -1,0 +1,34 @@
+# =====================================================================
+# .gitignore  —  XYZ123 clinical development repository
+# Rule: version PROGRAMS, never DATA or generated OUTPUT.
+# Datasets are the system of record owned by Data Management.
+# =====================================================================
+
+# ---- SAS data & transport files (owned by Data Management) ----
+*.sas7bdat
+*.sas7bcat
+*.sas7bndx
+*.xpt
+*.xpt2
+*.cport
+
+# ---- Logs & generated output ----
+*.log
+*.lst
+*.rtf
+*.pdf
+output/
+results/
+reports/
+
+
+# ---- CDISC / validation engine artefacts ----
+*.xlsx
+!docs/**/*.xlsx          # keep spec spreadsheets that live under docs/
+
+# ---- OS / editor junk ----
+.DS_Store
+Thumbs.db
+desktop.ini
+*.bak
+*~

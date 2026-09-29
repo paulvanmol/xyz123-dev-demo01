@@ -1,0 +1,191 @@
+"title","description"
+"feat(adam/adsl): add AGEGR1 age grouping derivation","**Corrected from the original DM issue.** `AGEGR1` is an **ADaM grouping variable**, not an SDTM DM variable. Per the ADaM IG (§3.1.1, rules #9–#10), variables ending in `GRy` are analysis groupings and are derived in **ADSL** from the SDTM `AGE` value. The DM domain only carries `AGE`/`AGEU`.
+
+### File to edit
+`programs/adam/adsl.sas`  *(NOT `programs/sdtm/dm.sas`)*
+
+### Change required
+Derive `AGEGR1` (character) from the numeric `AGE` variable using the pooling defined in the SAP. **Placeholder cut-points below — confirm against the SAP/spec before merge.**
+
+### Reference implementation (SAS)
+```sas
+length AGEGR1 $10;
+if AGE = . then AGEGR1 = '';
+else if AGE < 18 then AGEGR1 = '<18';
+else if AGE <= 64 then AGEGR1 = '18-64';
+else AGEGR1 = '>=65';
+label AGEGR1 = 'Pooled Age Group 1';
+```
+
+### Acceptance criteria
+- [ ] AGEGR1 is populated for every subject with a non-missing AGE.
+- [ ] Category boundaries and labels match the SAP (no overlaps / gaps).
+- [ ] Missing AGE yields a blank AGEGR1 (not a spurious group).
+- [ ] No change to record count or existing ADSL variables.
+- [ ] Program runs clean (no WARNING/ERROR) and log is archived.
+
+### Git workflow
+- **Branch:** `feature/xyz123-$gituser-adsl-agegr1`
+- **Commit:** `[XYZ123] Add AGEGR1 age grouping derivation to ADSL (SAP <section>)`
+- **MR title:** `feat(adam/adsl): add AGEGR1 age grouping derivation`
+
+```bash
+git switch -c feature/xyz123-$gituser-adsl-agegr1
+# edit programs/adam/adsl.sas
+git add programs/adam/adsl.sas
+git commit -m ""[XYZ123] Add AGEGR1 age grouping derivation to ADSL (SAP <section>)""
+git push -u origin feature/xyz123-$gituser-adsl-agegr1
+```
+
+### QC / definition of done
+- [ ] Independent QC review (double-programming or code review) completed.
+- [ ] ADaM spec / define.xml updated for the new variable (ADSL, not SDTM define).
+- [ ] MR approved and merged; branch deleted.
+
+/assign @dev1
+/label ~ADaM ~ADSL ~derivation ~""CDISC-correction""
+/weight 2"
+"feat(adam/adsl): add EOSSTT end-of-study status derivation","Derive **EOSSTT** (End of Study Status) in ADSL from the SDTM **DS** domain, per ADaM spec §3.2.
+
+### File to edit
+`programs/adam/adsl.sas`
+
+### Reference implementation (SAS)
+```sas
+proc sort data=sdtm.ds out=work.ds_eos;
+  by USUBJID descending DSSTDTC;
+  where DSDECOD ne """";
+run;
+data work.ds_last;
+  set work.ds_eos;
+  by USUBJID;
+  if first.USUBJID;
+  keep USUBJID DSDECOD;
+run;
+/* merge work.ds_last by USUBJID and assign:
+   COMPLETED -> COMPLETE, other -> DISCONT, none -> ONGOING */
+```
+
+### Acceptance criteria
+- [ ] EOSSTT populated for every subject (COMPLETE / DISCONT / ONGOING).
+- [ ] Values and mapping match the SAP disposition rules.
+- [ ] QC PROC COMPARE against qc_adsl.sas is clean.
+
+### Git workflow
+- **Branch:** `feature/xyz123-$gituser-adsl-eosstt`
+- **Commit:** `[XYZ123] Add EOSSTT derivation to ADSL (ADaM spec v1.0 s3.2)`
+
+/assign @dev2
+/label ~ADaM ~ADSL ~derivation
+/weight 2"
+"feat(adam/adae): add numeric AESEVN severity mapping","Map the character **AESEV** to a numeric **AESEVN** in ADAE, per SAP §4.2.
+
+### File to edit
+`programs/adam/adae.sas`
+
+### Reference implementation (SAS)
+```sas
+length AESEVN 8;
+select (upcase(AESEV));
+  when ('MILD')     AESEVN = 1;
+  when ('MODERATE') AESEVN = 2;
+  when ('SEVERE')   AESEVN = 3;
+  otherwise         AESEVN = .;
+end;
+label AESEVN = 'Severity/Intensity (N)';
+```
+
+### Acceptance criteria
+- [ ] AESEVN populated for all AE records with a non-missing AESEV.
+- [ ] 1/2/3 mapping matches the SAP; unmapped values are missing (not 0).
+- [ ] No change to existing ADAE record count or variables.
+
+### Git workflow
+- **Branch:** `feature/xyz123-$gituser-adae-severity`
+- **Commit:** `[XYZ123] Add numeric AESEVN severity to ADAE (SAP s4.2)`
+
+/assign @dev3
+/label ~ADaM ~ADAE ~derivation
+/weight 2"
+"feat(macros): add shared cross-study macro with CODEOWNERS review","Add a reusable macro under `macros/` that is shared across clinical studies. Because it touches shared code, the merge **must** be reviewed and approved (four-eyes) via CODEOWNERS.
+
+### Files
+- `macros/<macro_name>.sas` (new)
+- `CODEOWNERS` (ensure `macros/` requires lead approval)
+
+### Acceptance criteria
+- [ ] Macro is documented (header: purpose, parameters, example, SAP/spec ref).
+- [ ] CODEOWNERS routes `macros/**` to the lead for mandatory review.
+- [ ] MR approved by a code owner before merge to `main`.
+
+### Git workflow
+- **Branch:** `feature/xyz123-$gituser-macros-shared`
+- **Commit:** `[XYZ123] Add shared <macro_name> macro (CODEOWNERS review)`
+
+/assign @dev1
+/label ~macros ~shared-code ~""four-eyes""
+/weight 3"
+"qc(adsl): independent QC double-programming with PROC COMPARE","Independent QC of ADSL: a second programmer builds ADSL from the SAP on a separate branch; **PROC COMPARE** proves the two agree. The MR carries the QC evidence.
+
+### Files
+- Production: `programs/adam/adsl.sas` -> `adam.adsl`
+- QC: `validation/qc_adsl.sas` -> `qcout.adsl`
+
+### Reference (SAS)
+```sas
+proc compare base=adam.adsl compare=qcout.adsl
+  out=qcout.diff_adsl outnoequal outbase outcomp outdif listall;
+  id USUBJID;
+run;
+```
+
+### Acceptance criteria
+- [ ] QC ADSL developed independently (no copy of production code).
+- [ ] PROC COMPARE returns ""No unequal values were found"".
+- [ ] Compare output pasted into the QC merge request as evidence.
+
+### Git workflow
+- **Prod branch:** `feature/xyz123-$gituser-adam-adsl`
+- **QC branch:** `feature/xyz123-$gituser-qc-adsl`
+
+/assign @dev2
+/label ~QC ~double-programming ~ADSL
+/weight 3"
+"ci(pipeline): add GitLab CI validation + QC before PROD","Add a `.gitlab-ci.yml` that runs automatically on every MR into `main`: lint -> CDISC validation (Python) -> QC PROC COMPARE. The QC/validation stages call **SAS 9.4** in batch (`sas.exe -sysin`) on a GitLab Runner tagged `sas94-windows` — **not** the sas-viya CLI.
+
+### Files
+- `.gitlab-ci.yml` (new)
+- `validation/` QC + CDISC check scripts
+
+### Acceptance criteria
+- [ ] Pipeline triggers on push and merge request.
+- [ ] Lint stage flags hardcoded paths, missing headers, credentials.
+- [ ] CDISC validation stage runs (Python) and reports results.
+- [ ] QC stage runs PROC COMPARE via SAS 9.4 batch and fails the pipeline on diffs.
+- [ ] `main` protected — merge only via green pipeline + approved MR.
+
+### Git workflow
+- **Branch:** `feature/xyz123-$gituser-ci-pipeline`
+- **Commit:** `[XYZ123] Add CI pipeline: lint + CDISC validation + QC (SAS 9.4 batch)`
+
+/assign @dev3
+/label ~CI-CD ~DevOps ~validation
+/weight 5"
+"docs(release): add CHANGELOG.md and tag release with data version","Finalizing a study release requires (a) a maintained **CHANGELOG.md** tracking changes per release, and (b) tagging the release **associated with the specific data version** used.
+
+### Files
+- `CHANGELOG.md` (new, Keep-a-Changelog style)
+- Annotated git tag, e.g. `v1.0-DBL` referencing the frozen data snapshot/version
+
+### Acceptance criteria
+- [ ] CHANGELOG.md lists Added / Changed / Fixed per release with dates.
+- [ ] Release tag is annotated and references the exact data version (snapshot id / GCS version).
+- [ ] Tag created only after all MRs merged and pipeline green.
+
+### Git workflow
+- **Branch:** `feature/xyz123-$gituser-changelog-release`
+- **Commit:** `[XYZ123] Add CHANGELOG.md and prepare release tag with data version`
+
+/assign @dev1
+/label ~release ~docs ~audit-trail
+/weight 3"

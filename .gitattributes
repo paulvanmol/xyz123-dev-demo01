@@ -1,0 +1,25 @@
+# =====================================================================
+# .gitattributes  —  consistent handling of SAS source & binaries
+# =====================================================================
+
+# Treat SAS programs as text, normalise line endings to LF in the repo,
+# and diff them line-by-line. eol=lf avoids CRLF/LF churn between the
+# Windows clients and the Linux server.
+*.sas        text diff eol=lf
+*.py         text diff eol=lf
+*.md         text diff eol=lf
+*.txt        text diff eol=lf
+*.yml        text diff eol=lf
+*.yaml       text diff eol=lf
+
+# Never attempt to diff/merge binary deliverables.
+*.sas7bdat   binary
+*.sas7bcat   binary
+*.xpt        binary
+*.rtf        binary
+*.pdf        binary
+*.xlsx       binary
+
+# NOTE on encoding: migrated legacy programs may be WLATIN1/Windows-1252.
+# Git assumes UTF-8. Convert programs to UTF-8 before committing so that
+# accented characters (e.g. "déjà vu") are stored and diffed correctly.
