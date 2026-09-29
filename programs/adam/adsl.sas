@@ -13,7 +13,7 @@
 libname sdtm "&workshop_root./data/sdtm";
 libname adam "&workshop_root./data/adam";
 
-data adam.adsl;
+data work.adsl_base;
   set sdtm.dm;
   length TRT01P $40 TRT01PN 8 SAFFL $1 ITTFL $1;
   TRT01P=ARM; TRT01PN=ARMCD+0;
@@ -33,6 +33,40 @@ data adam.adsl;
             USUBJID, then assign EOSSTT.
      ----------------------------------------------------------------- */
 run;
+
+proc sort data=sdtm.ds out=work.ds_eos;
+	by USUBJID descending DSSTDTC;
+	where DSDECOD ne "";
+run;
+
+data work.ds_last;
+	set work.ds_eos;
+	by USUBJID;
+
+	if first.USUBJID;
+	keep USUBJID DSDECOD;
+run;
+
+data adam.adsl;
+	merge work.adsl_base(in=a) work.ds_last(in=b);
+	by USUBJID;
+
+	if a;
+	length EOSSTT $10;
+
+	if DSDECOD in ("COMPLETED") then
+		EOSSTT="COMPLETE";
+	else if DSDECOD ne "" then
+		EOSSTT="DISCONT";
+	else
+		EOSSTT="ONGOING";
+	label EOSSTT="End of Study Status";
+run;
+
+
 proc sort data=adam.adsl; by USUBJID; run;
-proc freq data=adam.adsl; tables SAFFL*TRT01P / missing;
-  title "XYZ123 ADSL (starter) - SAFFL by treatment"; run; title;
+/*Modify the proc freq and add EOSSTT to the tables statement*/
+proc freq data=adam.adsl;
+	tables EOSSTT SAFFL*TRT01P / missing;
+	title "XYZ123 ADSL (starter) - SAFFL by treatment";
+run;
