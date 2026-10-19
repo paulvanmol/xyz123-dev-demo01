@@ -23,6 +23,8 @@ data work.adsl_base;
   ITTFL="Y";
   if TRTSDT ne . then SAFFL="Y"; else SAFFL="N";
   label SAFFL="Safety Population Flag" ITTFL="Intent-to-Treat Population Flag";
+/*Derive AgeGroups */
+
   /* -----------------------------------------------------------------
      TODO (feature/xyz123-$gituser-adsl-eosstt):
        Derive EOSSTT from SDTM.DS per spec s3.2:
